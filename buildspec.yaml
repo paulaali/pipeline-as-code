@@ -7,8 +7,8 @@ phases:
   build:
     commands:
       - echo "Build started"
-      - aws cloudformation validate-template --template-body file://template.yml
+      - aws cloudformation validate-template --template-body file://template.yaml
 
 artifacts:
   files:
-    - template.yml
+    - template.yaml
