@@ -1,25 +1,28 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: Pipeline-as-Code Infrastructure
+Description: Week 7 – Pipeline-as-Code Infrastructure
 
 Parameters:
   VpcId:
     Type: AWS::EC2::VPC::Id
-    Description: VPC where resources will be deployed
+    Description: VPC where EC2 resources will be deployed
 
   SubnetId:
     Type: AWS::EC2::Subnet::Id
-    Description: Subnet for Auto Scaling Group
+    Description: Public subnet for Auto Scaling Group
 
 Resources:
   WebSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: Allow HTTP
+      GroupDescription: Allow HTTP access
       VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
           ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+        - IpProtocol: -1
           CidrIp: 0.0.0.0/0
 
   LaunchTemplate:
@@ -28,11 +31,15 @@ Resources:
       LaunchTemplateData:
         ImageId: ami-0a3c3a20c09d6f377
         InstanceType: t2.micro
-        SecurityGroupIds:
-          - !GetAtt WebSG.GroupId
+        NetworkInterfaces:
+          - DeviceIndex: 0
+            AssociatePublicIpAddress: true
+            Groups:
+              - !GetAtt WebSG.GroupId
         UserData:
           Fn::Base64: |
             #!/bin/bash
+            yum update -y
             yum install -y httpd
             systemctl start httpd
             systemctl enable httpd
@@ -41,16 +48,28 @@ Resources:
   AutoScalingGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
+      VPCZoneIdentifier:
+        - !Ref SubnetId
       MinSize: '1'
       MaxSize: '2'
       DesiredCapacity: '1'
-      VPCZoneIdentifier:
-        - !Ref SubnetId
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      HealthCheckType: EC2
+      HealthCheckGracePeriod: 120
     UpdatePolicy:
       AutoScalingRollingUpdate:
         MinInstancesInService: 1
         MaxBatchSize: 1
         PauseTime: PT5M
+        WaitOnResourceSignals: false
+
+Outputs:
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !GetAtt WebSG.GroupId
+
+  LaunchTemplateId:
+    Description: Launch Template ID
+    Value: !Ref LaunchTemplate
