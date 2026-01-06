@@ -1,11 +1,21 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: Pipeline-as-Code Infrastructure
 
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC where resources will be deployed
+
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: Subnet for Auto Scaling Group
+
 Resources:
   WebSG:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Allow HTTP
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 80
@@ -19,7 +29,7 @@ Resources:
         ImageId: ami-0a3c3a20c09d6f377
         InstanceType: t2.micro
         SecurityGroupIds:
-          - !Ref WebSG
+          - !GetAtt WebSG.GroupId
         UserData:
           Fn::Base64: |
             #!/bin/bash
@@ -34,11 +44,11 @@ Resources:
       MinSize: '1'
       MaxSize: '2'
       DesiredCapacity: '1'
+      VPCZoneIdentifier:
+        - !Ref SubnetId
       LaunchTemplate:
         LaunchTemplateId: !Ref LaunchTemplate
         Version: !GetAtt LaunchTemplate.LatestVersionNumber
-      VPCZoneIdentifier:
-        - subnet-xxxxxxxx
     UpdatePolicy:
       AutoScalingRollingUpdate:
         MinInstancesInService: 1
